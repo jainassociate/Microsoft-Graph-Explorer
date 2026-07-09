@@ -1,0 +1,6 @@
+{
+  "name": "Microsoft Graph OneDrive Explorer",
+  "description": "A professional Microsoft Graph OneDrive Explorer and API Testing Tool built using native Web APIs, custom Fluent Design CSS, and modular ES2023 Vanilla JS.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

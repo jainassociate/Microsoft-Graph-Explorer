@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Microsoft Graph OneDrive Explorer</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body class="light-theme">
+
+  <!-- Main Top Header -->
+  <header class="header">
+    <div class="brand">
+      <span class="brand-icon">☁️</span>
+      <span>Microsoft Graph OneDrive Explorer</span>
+    </div>
+    <div class="header-actions">
+      <!-- Token Status Indicator Badge -->
+      <span id="connection-badge" class="fluent-button" style="padding: 4px 8px; font-size: 11px; cursor: default; border-radius: 12px; pointer-events: none; background: #e1dfdd; color: #323130;">
+        🔴 Disconnected
+      </span>
+      <span id="token-expiry-timer" style="font-size: 11px; color: var(--text-secondary); display: none;"></span>
+      <!-- Dark/Light Theme Switcher -->
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 12px; color: var(--text-secondary);">Dark Theme</span>
+        <label class="theme-switch">
+          <input type="checkbox" id="theme-toggle">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+  </header>
+
+  <!-- Split Screen Workspace layout -->
+  <div class="workspace">
+    
+    <!-- Left collapsible navigation sidebar panel -->
+    <nav class="sidebar" id="app-sidebar">
+      <!-- Collapse toggle button -->
+      <div style="padding: 12px 16px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: flex-end;">
+        <button id="sidebar-toggle" class="fluent-button" style="padding: 4px 8px; font-size: 11px; min-width: auto; border: none;">
+          ◀▶
+        </button>
+      </div>
+      <ul class="sidebar-menu">
+        <li class="sidebar-item active" data-target="dashboard-view">
+          <span class="sidebar-icon">📊</span>
+          <span class="sidebar-text">Dashboard</span>
+        </li>
+        <li class="sidebar-item" data-target="explorer-view">
+          <span class="sidebar-icon">📁</span>
+          <span class="sidebar-text">Files & Folders</span>
+        </li>
+        <li class="sidebar-item" data-target="upload-view">
+          <span class="sidebar-icon">📤</span>
+          <span class="sidebar-text">Upload Queue</span>
+        </li>
+        <li class="sidebar-item" data-target="sharing-view">
+          <span class="sidebar-icon">🔗</span>
+          <span class="sidebar-text">Sharing & Links</span>
+        </li>
+        <li class="sidebar-item" data-target="versions-view">
+          <span class="sidebar-icon">🔄</span>
+          <span class="sidebar-text">Version History</span>
+        </li>
+        <li class="sidebar-item" data-target="search-view">
+          <span class="sidebar-icon">🔍</span>
+          <span class="sidebar-text">Advanced Search</span>
+        </li>
+        <li class="sidebar-item" data-target="delta-view">
+          <span class="sidebar-icon">⚡</span>
+          <span class="sidebar-text">Delta Sync API</span>
+        </li>
+        <li class="sidebar-item" data-target="recents-view">
+          <span class="sidebar-icon">📅</span>
+          <span class="sidebar-text">Recent & Shared</span>
+        </li>
+        <li class="sidebar-item" data-target="batch-view">
+          <span class="sidebar-icon">📦</span>
+          <span class="sidebar-text">Batch API</span>
+        </li>
+        <li class="sidebar-item" data-target="gexplorer-view">
+          <span class="sidebar-icon">🛠️</span>
+          <span class="sidebar-text">Graph Explorer</span>
+        </li>
+        <li class="sidebar-item" data-target="settings-view">
+          <span class="sidebar-icon">⚙️</span>
+          <span class="sidebar-text">Settings</span>
+        </li>
+        <li class="sidebar-item" data-target="logs-view">
+          <span class="sidebar-icon">📜</span>
+          <span class="sidebar-text">Console Logs</span>
+        </li>
+      </ul>
+    </nav>
+
+    <!-- Main Content Panel display area -->
+    <main class="main-view">
+
+      <!-- View 1: Dashboard Panel -->
+      <section id="dashboard-view" class="view-panel active">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 20px;">
+          <h2>OneDrive Storage Dashboard</h2>
+          <button id="refresh-dashboard-btn" class="fluent-button primary">🔄 Refresh Dashboard</button>
+        </div>
+        
+        <div class="dashboard-grid">
+          <!-- Card 1: Storage Quota Info -->
+          <div class="fluent-card">
+            <h3>💾 Storage Quota Overview</h3>
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
+              <div style="display: flex; justify-content: space-between;">
+                <span>Total Storage Capacity:</span>
+                <strong id="dash-total">N/A</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span>Used Storage:</span>
+                <strong id="dash-used">N/A</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span>Remaining Storage:</span>
+                <strong id="dash-remaining">N/A</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span>Recycle Bin Items:</span>
+                <strong id="dash-deleted">N/A</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span>Quota State:</span>
+                <strong id="dash-state" style="color: var(--accent);">N/A</strong>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 2: Visual storage gauge graph -->
+          <div class="fluent-card" style="align-items: center; justify-content: center; min-height: 180px;">
+            <h3>📊 Quota Utilization</h3>
+            <div style="position: relative; width: 120px; height: 120px; border-radius: 50%; background: conic-gradient(var(--accent) 0%, var(--border-color) 0%); display: flex; align-items: center; justify-content: center; margin-top: 10px;" id="storage-radial-gauge">
+              <div style="width: 100px; height: 100px; border-radius: 50%; background-color: var(--bg-card); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 14px; font-weight: 600;">
+                <span id="storage-pct-label">0%</span>
+                <span style="font-size: 10px; color: var(--text-secondary); font-weight: normal;">Used</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 3: Core Drive Properties details -->
+          <div class="fluent-card">
+            <h3>ℹ️ OneDrive Info</h3>
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
+              <div style="display: flex; justify-content: space-between;">
+                <span>Drive Owner Name:</span>
+                <strong id="dash-owner">N/A</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span>Drive Type:</span>
+                <strong id="dash-type">N/A</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span>Drive Unique ID:</span>
+                <span id="dash-id" style="font-family: var(--font-mono); font-size: 11px; word-break: break-all; max-width: 180px; text-align: right;">N/A</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- View 2: File/Folder Explorer Panel -->
+      <section id="explorer-view" class="view-panel">
+        <div class="split-pane">
+          <!-- Left side file browser panel -->
+          <div class="left-pane" style="display: flex; flex-direction: column;">
+            
+            <!-- Breadcrumb Navigation toolbar -->
+            <div class="explorer-toolbar">
+              <div style="display: flex; gap: 4px;">
+                <button id="explorer-back-btn" class="fluent-button" style="padding: 4px 8px;" title="Back">◀</button>
+                <button id="explorer-forward-btn" class="fluent-button" style="padding: 4px 8px;" title="Forward">▶</button>
+                <button id="explorer-refresh-btn" class="fluent-button" style="padding: 4px 8px;" title="Refresh">🔄</button>
+              </div>
+              <!-- Breadcrumb display area -->
+              <div class="breadcrumb-bar" id="explorer-breadcrumbs">
+                <span class="breadcrumb-item active" data-id="root">OneDrive Root</span>
+              </div>
+              <!-- Create folder & quick action items -->
+              <div style="display: flex; gap: 8px;">
+                <button id="explorer-new-folder-btn" class="fluent-button primary">➕ New Folder</button>
+                <button id="explorer-quick-upload-btn" class="fluent-button">📤 Upload Files</button>
+              </div>
+            </div>
+
+            <!-- View Controls & Grid/List Toggler -->
+            <div style="display: flex; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid var(--border-color); background-color: var(--bg-sidebar);">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span>Sort by:</span>
+                <select id="explorer-sort-select" class="fluent-input" style="padding: 3px 6px;">
+                  <option value="name_asc">Name (A-Z)</option>
+                  <option value="name_desc">Name (Z-A)</option>
+                  <option value="size_desc">Size (Large to Small)</option>
+                  <option value="size_asc">Size (Small to Large)</option>
+                  <option value="date_desc">Modified (Newest)</option>
+                  <option value="date_asc">Modified (Oldest)</option>
+                </select>
+                <input type="text" id="explorer-filter-input" class="fluent-input" placeholder="Filter items in view..." style="padding: 3px 6px; width: 160px;">
+              </div>
+              <div style="display: flex; gap: 4px;">
+                <button id="toggle-list-view-btn" class="fluent-button active" style="padding: 4px 8px;" title="List View">📋 List</button>
+                <button id="toggle-grid-view-btn" class="fluent-button" style="padding: 4px 8px;" title="Grid View">🔲 Grid</button>
+              </div>
+            </div>
+
+            <!-- Main File List display viewport -->
+            <div class="files-container" id="files-list-viewport">
+              <!-- Render lists dynamically here -->
+            </div>
+          </div>
+
+          <!-- Vertical Split pane resizer bar -->
+          <div class="resizer-v" id="explorer-pane-resizer"></div>
+
+          <!-- Right side details panel -->
+          <div class="right-pane" id="explorer-details-pane">
+            <div style="padding: 16px; border-bottom: 1px solid var(--border-color); font-weight: 600; font-size: 14px; background-color: var(--bg-sidebar);">
+              ℹ️ Item Information Details
+            </div>
+            <div style="padding: 20px; display: flex; flex-direction: column; gap: 16px; flex: 1;" id="details-panel-empty">
+              <span style="color: var(--text-muted); text-align: center; margin-top: 40px;">Select a file or folder to view metadata and perform deep Graph actions.</span>
+            </div>
+            <!-- Populated item details pane -->
+            <div style="padding: 20px; display: none; flex-direction: column; gap: 16px; overflow-y: auto;" id="details-panel-content">
+              <div style="text-align: center; border-bottom: 1px solid var(--border-color); padding-bottom: 16px;">
+                <div id="details-type-icon" style="font-size: 44px; margin-bottom: 8px;">📄</div>
+                <h4 id="details-item-name" style="word-break: break-all; font-size: 15px; font-weight: 600;">File_Name.pdf</h4>
+                <span id="details-item-size" style="font-size: 12px; color: var(--text-secondary);">4.2 MB</span>
+              </div>
+
+              <!-- Quick action operations buttons -->
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <button id="action-download-btn" class="fluent-button primary">📥 Download</button>
+                <button id="action-rename-btn" class="fluent-button">✏️ Rename</button>
+                <button id="action-move-btn" class="fluent-button">➡️ Move</button>
+                <button id="action-copy-btn" class="fluent-button">📋 Copy</button>
+                <button id="action-sharing-btn" class="fluent-button">🔗 Share</button>
+                <button id="action-delete-btn" class="fluent-button" style="color: var(--status-error); border-color: var(--status-error);">🗑️ Delete</button>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border-color); padding-top: 14px;">
+                <strong>Properties:</strong>
+                <div style="display: flex; justify-content: space-between; font-size: 12px;">
+                  <span>Last Modified:</span>
+                  <span id="details-item-modified">N/A</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 12px;">
+                  <span>Modified By:</span>
+                  <span id="details-item-owner" style="max-width: 150px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">N/A</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 12px;">
+                  <span>Checkout State:</span>
+                  <span id="details-checkout-status">Checked In</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 12px;">
+                  <span>OneDrive ID:</span>
+                  <span id="details-item-id" style="font-family: var(--font-mono); font-size: 10px; max-width: 150px; word-break: break-all;">N/A</span>
+                </div>
+              </div>
+
+              <!-- Additional Check-in / Check-out panel block -->
+              <div id="details-checkout-controls" style="border-top: 1px solid var(--border-color); padding-top: 14px; display: none; flex-direction: column; gap: 8px;">
+                <strong>Version Control Actions:</strong>
+                <button id="action-checkout-btn" class="fluent-button">🔒 Check Out File</button>
+                <div id="checkin-inputs" style="display: none; flex-direction: column; gap: 8px;">
+                  <input type="text" id="checkin-comment" class="fluent-input" placeholder="Checkin Comments...">
+                  <button id="action-checkin-btn" class="fluent-button primary">🔑 Check In File</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- View 3: Upload Panel -->
+      <section id="upload-view" class="view-panel">
+        <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 20px;">
+          <h2>File Upload Center & Queue</h2>
+          <p style="color: var(--text-secondary); margin-top: 4px;">Upload small files (PUT) or massive files dynamically in background-controlled byte sessions.</p>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 20px;">
+          <!-- Left Drag and Drop asset zones -->
+          <div class="fluent-card" style="border-style: dashed; border-width: 2px; align-items: center; justify-content: center; height: 300px; cursor: pointer;" id="upload-dropzone">
+            <span style="font-size: 48px;">📤</span>
+            <strong style="margin-top: 12px;">Drag & Drop Files Here</strong>
+            <span style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">or click to select files from device</span>
+            <input type="file" id="upload-file-picker" multiple style="display: none;">
+          </div>
+
+          <!-- Right side queue controls and tables -->
+          <div class="fluent-card" style="flex: 1;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+              <h3>📋 Active Transfer Queue</h3>
+              <div style="display: flex; gap: 8px;">
+                <button id="clear-completed-queue-btn" class="fluent-button" style="padding: 4px 8px;">🧹 Clear Completed</button>
+                <button id="clear-all-queue-btn" class="fluent-button" style="padding: 4px 8px; color: var(--status-error); border-color: var(--status-error);">❌ Clear All</button>
+              </div>
+            </div>
+
+            <!-- Empty transfer notice display -->
+            <div id="upload-queue-empty" style="text-align: center; color: var(--text-muted); padding: 40px 0;">
+              No files currently being uploaded. Add items using the drag drop zone or files view to start transfers.
+            </div>
+
+            <!-- Container for the dynamic list of upload rows -->
+            <div class="transfer-queue" id="upload-queue-container" style="display: none;">
+              <!-- Javascript injects active items here -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- View 4: Sharing & Links Panel -->
+      <section id="sharing-view" class="view-panel">
+        <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 20px;">
+          <h2>Sharing, Links, & Permissions Control</h2>
+          <p style="color: var(--text-secondary); margin-top: 4px;">Audit permissions, create password-protected expiry links, and invite users directly to items.</p>
+        </div>
+
+        <!-- Layout for sharing actions -->
+        <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px;">
+          <!-- Left details table auditing item links -->
+          <div class="fluent-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <h3>📋 Active Item Permissions & Links</h3>
+              <button id="refresh-permissions-btn" class="fluent-button" style="padding: 4px 8px;">🔄 Refresh List</button>
+            </div>
+            
+            <div class="fluent-input-group">
+              <label for="share-item-selector">Select Item from Current Directory:</label>
+              <select id="share-item-selector" class="fluent-input">
+                <option value="">-- No file/folder selected --</option>
+              </select>
+            </div>
+
+            <div id="permissions-empty" style="text-align: center; color: var(--text-muted); padding: 30px 0;">
+              Select an item above to audit existing permission links and grant privileges.
+            </div>
+
+            <div id="permissions-table-container" style="display: none; overflow-x: auto;">
+              <table style="width: 100%; border-collapse: collapse; font-size: 13px; text-align: left;">
+                <thead>
+                  <tr style="border-bottom: 2px solid var(--border-color); padding-bottom: 6px;">
+                    <th style="padding: 8px 0;">Target / Role</th>
+                    <th style="padding: 8px 0;">Scope / Type</th>
+                    <th style="padding: 8px 0;">Access Details</th>
+                    <th style="padding: 8px 0; text-align: right;">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="permissions-rows">
+                  <!-- JS builds entries here -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Right panels adding invite users and links forms -->
+          <div style="display: flex; flex-direction: column; gap: 20px;">
+            <!-- Panel 1: Create link -->
+            <div class="fluent-card">
+              <h3>🔗 Generate Sharing Link</h3>
+              <form id="create-link-form" style="display: flex; flex-direction: column; gap: 10px; margin-top: 8px;">
+                <div class="fluent-input-group">
+                  <label for="link-type">Permission Type:</label>
+                  <select id="link-type" class="fluent-input">
+                    <option value="view">Read-Only (View)</option>
+                    <option value="edit">Read/Write (Edit)</option>
+                  </select>
+                </div>
+                <div class="fluent-input-group">
+                  <label for="link-scope">Audience Scope:</label>
+                  <select id="link-scope" class="fluent-input">
+                    <option value="anonymous">Anyone (Anonymous Link)</option>
+                    <option value="organization">Organization Members Only</option>
+                  </select>
+                </div>
+                <div class="fluent-input-group">
+                  <label for="link-password">Optional Password Protection (Business account only):</label>
+                  <input type="password" id="link-password" class="fluent-input" placeholder="Set password...">
+                </div>
+                <div class="fluent-input-group">
+                  <label for="link-expiry">Optional Expiration Date:</label>
+                  <input type="datetime-local" id="link-expiry" class="fluent-input">
+                </div>
+                <button type="submit" class="fluent-button primary" style="margin-top: 8px;">Create Sharing Link</button>
+              </form>
+            </div>
+
+            <!-- Panel 2: Direct invite -->
+            <div class="fluent-card">
+              <h3>✉️ Invite Recipients Directly</h3>
+              <form id="invite-users-form" style="display: flex; flex-direction: column; gap: 10px; margin-top: 8px;">
+                <div class="fluent-input-group">
+                  <label for="invite-emails">Recipient Email Addresses (Comma separated):</label>
+                  <input type="text" id="invite-emails" class="fluent-input" placeholder="e.g. user1@outlook.com, user2@domain.com" required>
+                </div>
+                <div class="fluent-input-group">
+                  <label for="invite-role">Select Assigned Role:</label>
+                  <select id="invite-role" class="fluent-input">
+                    <option value="read">Can Read (View)</option>
+                    <option value="write">Can Write (Edit)</option>
+                  </select>
+                </div>
+                <div class="fluent-input-group">
+                  <label for="invite-message">Personalized Invitation Message:</label>
+                  <textarea id="invite-message" class="fluent-input" rows="3" placeholder="Enter greeting message..."></textarea>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <input type="checkbox" id="invite-send-notif" checked>
+                  <label for="invite-send-notif" style="font-size: 12px; color: var(--text-secondary); cursor: pointer;">Send email notification invitation</label>
+                </div>
+                <button type="submit" class="fluent-button primary" style="margin-top: 8px;">Grant & Invite</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- View 5: Versions Panel -->
+      <section id="versions-view" class="view-panel">
+        <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 20px;">
+          <h2>Version History Management</h2>
+          <p style="color: var(--text-secondary); margin-top: 4px;">Track modifications, download previous files, delete historical checkpoints, or restore specific versions instantly.</p>
+        </div>
+
+        <div class="fluent-card" style="max-width: 900px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h3>📋 Historical Versions List</h3>
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <select id="version-item-selector" class="fluent-input" style="width: 250px;">
+                <option value="">-- Select File Item --</option>
+              </select>
+              <button id="refresh-versions-btn" class="fluent-button">🔄 Refresh Versions</button>
+            </div>
+          </div>
+
+          <div id="versions-empty" style="text-align: center; color: var(--text-muted); padding: 40px 0;">
+            Select a file item above to audit historical version lists and perform rollbacks.
+          </div>
+
+          <div id="versions-table-container" style="display: none; overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 13px; text-align: left;">
+              <thead>
+                <tr style="border-bottom: 2px solid var(--border-color); padding-bottom: 6px;">
+                  <th style="padding: 10px 0;">Version ID</th>
+                  <th style="padding: 10px 0;">Modified Date</th>
+                  <th style="padding: 10px 0;">Modifier</th>
+                  <th style="padding: 10px 0;">Size</th>
+                  <th style="padding: 10px 0; text-align: right;">Rollback Action</th>
+                </tr>
+              </thead>
+              <tbody id="versions-rows">
+                <!-- JS builds table rows here -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- View 6: Search Panel -->
+      <section id="search-view" class="view-panel">
+        <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 20px;">
+          <h2>OneDrive Advanced Search</h2>
+          <p style="color: var(--text-secondary); margin-top: 4px;">Query across your entire storage space using text matching, dates, and sizes.</p>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 2.5fr; gap: 20px;">
+          <!-- Left side search filters parameters -->
+          <div class="fluent-card">
+            <h3>🔍 Search Parameters</h3>
+            <form id="advanced-search-form" style="display: flex; flex-direction: column; gap: 12px; margin-top: 8px;">
+              <div class="fluent-input-group">
+                <label for="search-query-input">Filename / Content Term:</label>
+                <input type="text" id="search-query-input" class="fluent-input" placeholder="Enter keywords..." required>
+              </div>
+              <div class="fluent-input-group">
+                <label for="search-ext-select">File Extension Filter:</label>
+                <select id="search-ext-select" class="fluent-input">
+                  <option value="">-- All Extensions --</option>
+                  <option value="pdf">PDF Documents (.pdf)</option>
+                  <option value="docx">Word Files (.docx, .doc)</option>
+                  <option value="xlsx">Excel Sheets (.xlsx, .xls)</option>
+                  <option value="png">Images (.png, .jpg, .jpeg)</option>
+                  <option value="zip">Archive Packages (.zip, .rar)</option>
+                </select>
+              </div>
+              <div class="fluent-input-group">
+                <label for="search-size-select">File Size Limit:</label>
+                <select id="search-size-select" class="fluent-input">
+                  <option value="">-- Any Size --</option>
+                  <option value="small">Small Files (&lt; 1 MB)</option>
+                  <option value="medium">Medium Files (1 MB - 25 MB)</option>
+                  <option value="large">Large Files (&gt; 25 MB)</option>
+                </select>
+              </div>
+              <button type="submit" class="fluent-button primary" style="margin-top: 10px;">Run Search Query</button>
+            </form>
+          </div>
+
+          <!-- Right side matches viewport -->
+          <div class="fluent-card" style="flex: 1;">
+            <h3>📋 Match Results</h3>
+            <div id="search-results-empty" style="text-align: center; color: var(--text-muted); padding: 50px 0;">
+              Enter a search criteria on the left to display matches.
+            </div>
+            <!-- File Matches View -->
+            <div id="search-results-container" style="display: none; overflow-y: auto; max-height: 400px;" class="file-list-header">
+              <!-- Grid list items rendered in JS -->
+            </div>
+            <div id="search-results-rows" style="display: flex; flex-direction: column; gap: 1px;"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- View 7: Delta Sync Panel -->
+      <section id="delta-view" class="view-panel">
+        <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 20px;">
+          <h2>Delta Sync Tracker API</h2>
+          <p style="color: var(--text-secondary); margin-top: 4px;">Monitor modifications, creations, and file deletions in real-time across your OneDrive using Graph Deltas.</p>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px;">
+          <!-- Left side events logger container -->
+          <div class="fluent-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <h3>⚡ Delta Log Stream Events</h3>
+              <div style="display: flex; gap: 8px;">
+                <button id="delta-start-btn" class="fluent-button primary">⚡ Run Delta</button>
+                <button id="delta-reset-btn" class="fluent-button" style="color: var(--status-error); border-color: var(--status-error);">🔄 Reset Token</button>
+              </div>
+            </div>
+
+            <div class="fluent-input-group">
+              <label>Stored Delta Sync Next Link Token:</label>
+              <textarea id="delta-token-display" class="fluent-input" rows="2" style="font-family: var(--font-mono); font-size: 11px;" readonly placeholder="No sync token stored yet. Run Delta sync above to generate sync track URLs."></textarea>
+            </div>
+
+            <!-- Empty delta warning -->
+            <div id="delta-events-empty" style="text-align: center; color: var(--text-muted); padding: 40px 0;">
+              Run a Delta Sync to check for updates and log real-time item modifications.
+            </div>
+
+            <!-- Scrollable events table list -->
+            <div id="delta-events-table-container" style="display: none; overflow-x: auto;">
+              <table style="width: 100%; border-collapse: collapse; font-size: 13px; text-align: left;">
+                <thead>
+                  <tr style="border-bottom: 2px solid var(--border-color); padding-bottom: 6px;">
+                    <th style="padding: 8px 0;">Event/Change</th>
+                    <th style="padding: 8px 0;">Item Name</th>
+                    <th style="padding: 8px 0;">Category</th>
+                    <th style="padding: 8px 0;">Modified Time</th>
+                  </tr>
+                </thead>
+                <tbody id="delta-event-rows">
+                  <!-- JS builds changes here -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Right side delta explanation guidelines -->
+          <div class="fluent-card">
+            <h3>📖 Understanding Delta APIs</h3>
+            <p style="line-height: 1.5; color: var(--text-secondary);">
+              The Delta API allows you to maintain synchronization with files in a drive.
+              Rather than iterating over all items in a massive folder list:
+            </p>
+            <ol style="margin-left: 20px; line-height: 1.6; color: var(--text-secondary); display: flex; flex-direction: column; gap: 8px;">
+              <li>You call the <code>/delta</code> endpoint initially to capture all existing files.</li>
+              <li>The API response includes a state token (<code>@odata.deltaLink</code>).</li>
+              <li>Future queries targeting this token only return <strong>modified</strong>, <strong>added</strong>, or <strong>deleted</strong> changes since your last check.</li>
+              <li>Perfect for background syncing and notification processing systems.</li>
+            </ol>
+          </div>
+        </div>
+      </section>
+
+      <!-- View 8: Recent & Shared Panel -->
+      <section id="recents-view" class="view-panel">
+        <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 20px;">
+          <h2>Recent & Shared Items</h2>
+          <p style="color: var(--text-secondary); margin-top: 4px;">Audits items recently modified or documents explicitly shared with you across organization domains.</p>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+          <!-- Panel 1: Recent Files -->
+          <div class="fluent-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <h3>📅 Recent Files</h3>
+              <button id="refresh-recent-btn" class="fluent-button">🔄 Refresh</button>
+            </div>
+            
+            <div id="recent-empty" style="text-align: center; color: var(--text-muted); padding: 40px 0;">
+              No recent files logged. Click Refresh to query Microsoft Graph.
+            </div>
+
+            <div id="recent-list" style="display: flex; flex-direction: column; gap: 4px;">
+              <!-- JS maps details here -->
+            </div>
+          </div>
+
+          <!-- Panel 2: Shared files -->
+          <div class="fluent-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <h3>👥 Shared With Me</h3>
+              <button id="refresh-shared-btn" class="fluent-button">🔄 Refresh</button>
+            </div>
+
+            <div id="shared-empty" style="text-align: center; color: var(--text-muted); padding: 40px 0;">
+              No documents shared with you. Click Refresh to query.
+            </div>
+
+            <div id="shared-list" style="display: flex; flex-direction: column; gap: 4px;">
+              <!-- JS maps details here -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- View 9: Batch API Panel -->
+      <section id="batch-view" class="view-panel">
+        <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 20px;">
+          <h2>Microsoft Graph JSON Batching (/$batch)</h2>
+          <p style="color: var(--text-secondary); margin-top: 4px;">Consolidate up to 20 individual API queries into a single HTTP POST batch to minimize server roundtrips.</p>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 20px;">
+          <!-- Left Batch Builder & Presets -->
+          <div class="fluent-card">
+            <h3>📦 Batch request sequences</h3>
+            <div class="fluent-input-group" style="margin-top: 10px;">
+              <label for="batch-preset-select">Select Built-In Batch Template:</label>
+              <select id="batch-preset-select" class="fluent-input">
+                <option value="">-- Select Template --</option>
+              </select>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--border-color); padding-top: 14px;">
+              <strong>Configured Requests inside Batch:</strong>
+              <div id="batch-requests-list" style="display: flex; flex-direction: column; gap: 8px;">
+                <span style="color: var(--text-muted); text-align: center; padding: 20px 0;">No active batch structured. Choose a preset template above.</span>
+              </div>
+            </div>
+
+            <button id="execute-batch-btn" class="fluent-button primary" style="margin-top: 14px;" disabled>🚀 Run Configured Batch API</button>
+          </div>
+
+          <!-- Right side visual returns mapping -->
+          <div class="fluent-card" style="flex: 1;">
+            <h3>📋 Batch Responses Output</h3>
+            <div id="batch-responses-empty" style="text-align: center; color: var(--text-muted); padding: 50px 0;">
+              Responses of consolidated items will render here upon running.
+            </div>
+            <div id="batch-responses-results" style="display: none; flex-direction: column; gap: 12px; overflow-y: auto; max-height: 420px;">
+              <!-- Dynamic rendering mapping each individual status -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- View 10: Graph Explorer REST Tester Panel -->
+      <section id="gexplorer-view" class="view-panel">
+        <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 16px;">
+          <h2>Microsoft Graph REST Explorer</h2>
+          <p style="color: var(--text-secondary); margin-top: 4px;">A fully-featured HTTP request composer. Test any Microsoft Graph endpoint with custom headers & bodies.</p>
+        </div>
+
+        <!-- REST Tester Main Layout -->
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+          
+          <!-- URL & Method input bar -->
+          <div class="fluent-card" style="flex-direction: row; align-items: center; gap: 10px; padding: 12px 16px;">
+            <select id="req-method" class="fluent-input" style="width: 100px; font-weight: 600;">
+              <option value="GET">GET</option>
+              <option value="POST">POST</option>
+              <option value="PUT">PUT</option>
+              <option value="PATCH">PATCH</option>
+              <option value="DELETE">DELETE</option>
+              <option value="HEAD">HEAD</option>
+              <option value="OPTIONS">OPTIONS</option>
+            </select>
+            <input type="text" id="req-url" class="fluent-input" style="flex: 1; font-family: var(--font-mono);" placeholder="https://graph.microsoft.com/v1.0/me">
+            <button id="send-request-btn" class="fluent-button primary" style="padding: 8px 24px;">Send Request</button>
+            <button id="save-favorite-btn" class="fluent-button" style="padding: 8px 12px;" title="Add to Favorites">⭐</button>
+          </div>
+
+          <!-- Split Workspace Layout: Left (Editor) vs Right (Response) -->
+          <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 16px;">
+            
+            <!-- Left inputs (Headers & Request Body) -->
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+              <!-- Key Value headers list panel -->
+              <div class="fluent-card">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <h3>🔧 Custom Headers (JSON format)</h3>
+                  <button id="reset-headers-btn" class="fluent-button" style="padding: 3px 6px; font-size: 11px;">Reset Defaults</button>
+                </div>
+                <textarea id="req-headers" class="fluent-input" rows="4" style="font-family: var(--font-mono); font-size: 12px;">{
+  "ConsistencyLevel": "eventual"
+}</textarea>
+              </div>
+
+              <!-- Request Body block -->
+              <div class="fluent-card">
+                <h3>Payload Request Body (JSON)</h3>
+                <textarea id="req-body" class="fluent-input" rows="8" style="font-family: var(--font-mono); font-size: 12px;" placeholder="{&#10;  &quot;name&quot;: &quot;MyFolder&quot;&#10;}"></textarea>
+              </div>
+
+              <!-- History & Favorites tabs block -->
+              <div class="fluent-card" style="flex: 1; min-height: 200px;">
+                <div style="display: flex; gap: 8px; border-bottom: 1px solid var(--border-color); padding-bottom: 6px;">
+                  <button id="tab-history-btn" class="tab-btn active">History</button>
+                  <button id="tab-favorites-btn" class="tab-btn">Saved Favorites</button>
+                </div>
+                <div id="explorer-list-container" style="overflow-y: auto; max-height: 180px; margin-top: 8px;">
+                  <!-- Dynamic render from database logs -->
+                </div>
+              </div>
+            </div>
+
+            <!-- Right pane outputting results and equivalent code generation -->
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+              <!-- Response details card -->
+              <div class="fluent-card" style="flex: 1; min-height: 300px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <h3>📋 Response Panel</h3>
+                    <span id="res-status-badge" class="fluent-button" style="padding: 2px 8px; font-size: 11px; display: none; pointer-events: none;"></span>
+                    <span id="res-time" style="font-size: 12px; color: var(--text-secondary);"></span>
+                  </div>
+                  <div style="display: flex; gap: 8px;">
+                    <button id="copy-response-btn" class="fluent-button" style="padding: 4px 8px; font-size: 11px;">📋 Copy</button>
+                    <button id="download-response-btn" class="fluent-button" style="padding: 4px 8px; font-size: 11px;">📥 Download JSON</button>
+                  </div>
+                </div>
+                <!-- Prettified visual response container scroll -->
+                <div id="res-empty" style="text-align: center; color: var(--text-muted); padding: 80px 0; flex: 1; display: flex; align-items: center; justify-content: center;">
+                  Send a query to display full Microsoft Graph response details here.
+                </div>
+                <pre id="res-body-pre" style="display: none; flex: 1; max-height: 320px; overflow-y: auto; background-color: #1e1e1e; color: #d4d4d4;"></pre>
+              </div>
+
+              <!-- Real-time code snippets generation container -->
+              <div class="fluent-card">
+                <h3>💻 Auto-Generated Equivalent SDK Code</h3>
+                <div class="snippet-tabs" id="code-snippets-tabs">
+                  <button class="tab-btn active" data-lang="curl">cURL</button>
+                  <button class="tab-btn" data-lang="javascript">JavaScript</button>
+                  <button class="tab-btn" data-lang="powershell">PowerShell</button>
+                  <button class="tab-btn" data-lang="csharp">C# (.NET)</button>
+                  <button class="tab-btn" data-lang="python">Python</button>
+                </div>
+                <pre id="code-snippet-pre" style="background-color: #1e1e1e; color: #d4d4d4; height: 160px; overflow-y: auto; margin-top: 8px;"></pre>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- View 11: Settings Panel -->
+      <section id="settings-view" class="view-panel">
+        <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 20px;">
+          <h2>Application Connection Settings</h2>
+          <p style="color: var(--text-secondary); margin-top: 4px;">Set Microsoft Graph credentials. Configured values persist locally in browser LocalStorage caches.</p>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 20px; align-items: start;">
+          <!-- Left: Credentials Form -->
+          <div class="fluent-card">
+            <h3>🔑 Credentials & Endpoint Configurations</h3>
+            <p style="color: var(--text-secondary); font-size: 12px; margin-bottom: 12px;">Ensure you input a valid access token generated with the correct Microsoft Graph scopes.</p>
+            <form id="settings-form" style="display: flex; flex-direction: column; gap: 14px;">
+              <div class="fluent-input-group">
+                <label for="set-access-token">Microsoft Graph Access Token:</label>
+                <textarea id="set-access-token" class="fluent-input" rows="5" placeholder="Copy paste your Azure AD bearer token..." required style="font-family: var(--font-mono); font-size: 11px;"></textarea>
+              </div>
+              <div class="fluent-input-group">
+                <label for="set-base-url">Graph API Base URL Endpoint:</label>
+                <input type="url" id="set-base-url" class="fluent-input" placeholder="https://graph.microsoft.com/v1.0" required>
+              </div>
+              <div class="fluent-input-group">
+                <label for="set-user-id">OneDrive Target User / Directory Email ID:</label>
+                <input type="email" id="set-user-id" class="fluent-input" placeholder="drive@tzm06.onmicrosoft.com" required>
+              </div>
+              <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;">
+                <button type="submit" class="fluent-button primary">💾 Save & Authenticate Credentials</button>
+                <button id="test-connection-btn" type="button" class="fluent-button">🔌 Run Connection Check</button>
+                <button id="reset-settings-btn" type="button" class="fluent-button" style="color: var(--status-error); border-color: var(--status-error);">🧹 Reset To Defaults</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Right: Interactive Graph API Integration Guide -->
+          <div class="fluent-card" style="line-height: 1.6;">
+            <h3>📘 Microsoft Graph API Setup Guide</h3>
+            <p style="color: var(--text-secondary); font-size: 12px; margin-bottom: 14px;">Complete manual to register your Azure App, grant correct OneDrive scopes, and generate active access tokens.</p>
+
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+              <!-- Accordion Step 1 -->
+              <div style="background-color: var(--bg-hover); padding: 12px; border-radius: 6px; border-left: 4px solid var(--accent);">
+                <strong style="display: block; font-size: 13px; color: var(--text-primary); margin-bottom: 4px;">1️⃣ App Registration in Microsoft Entra ID</strong>
+                <span style="font-size: 12px; color: var(--text-secondary);">
+                  Go to <a href="https://entra.microsoft.com" target="_blank" style="color: var(--accent); text-decoration: underline;">Microsoft Entra admin center</a> or Azure Portal.
+                  Go to <strong>Identity</strong> > <strong>Applications</strong> > <strong>App registrations</strong> > <strong>New registration</strong>. 
+                  Provide a name (e.g., <code>OneDrive Explorer</code>), choose supported account types (e.g. Multi-tenant + Personal accounts), select <strong>Single-page application (SPA)</strong> or <strong>Web</strong> redirect type, and click <strong>Register</strong>.
+                </span>
+              </div>
+
+              <!-- Accordion Step 2 -->
+              <div style="background-color: var(--bg-hover); padding: 12px; border-radius: 6px; border-left: 4px solid var(--accent);">
+                <strong style="display: block; font-size: 13px; color: var(--text-primary); margin-bottom: 4px;">2️⃣ Configuring API Permissions (OneDrive Scopes)</strong>
+                <span style="font-size: 12px; color: var(--text-secondary);">
+                  In your new App Registration, go to <strong>API permissions</strong> > <strong>Add a permission</strong> > <strong>Microsoft Graph</strong>.<br>
+                  Select <strong>Delegated permissions</strong> (or Application permissions for daemon service scripts) and add these crucial scopes:
+                  <ul style="margin: 6px 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px;">
+                    <li><code>Files.ReadWrite.All</code> — Required for folder listings, file creation, deleting, copying, and renaming.</li>
+                    <li><code>User.Read</code> — Required to view Storage quotas, dashboard statistics, and login accounts.</li>
+                    <li><code>offline_access</code> — Required to obtain refresh tokens for persistent background synchronization.</li>
+                  </ul>
+                  <em>Note: Remember to click <strong>Grant admin consent for [Tenant]</strong> if requested by your organization rules.</em>
+                </span>
+              </div>
+
+              <!-- Accordion Step 3 -->
+              <div style="background-color: var(--bg-hover); padding: 12px; border-radius: 6px; border-left: 4px solid var(--accent);">
+                <strong style="display: block; font-size: 13px; color: var(--text-primary); margin-bottom: 4px;">3️⃣ Interactive Access Token Request (Implicit Flow)</strong>
+                <span style="font-size: 12px; color: var(--text-secondary); display: block; margin-bottom: 8px;">
+                  Fill in your registered App ID to generate an interactive Authorization Request Link that grants an Access Token in your browser:
+                </span>
+                <div style="display: flex; flex-direction: column; gap: 8px; background: rgba(0,0,0,0.15); padding: 10px; border-radius: 4px; font-size: 11px;">
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                    <div>
+                      <label style="font-weight: 600;">Application (Client) ID:</label>
+                      <input type="text" id="guide-client-id" class="fluent-input" style="padding: 2px 6px; font-size: 11px;" placeholder="Enter Azure App Client ID">
+                    </div>
+                    <div>
+                      <label style="font-weight: 600;">Redirect URI:</label>
+                      <input type="text" id="guide-redirect-uri" class="fluent-input" style="padding: 2px 6px; font-size: 11px;" value="https://developer.microsoft.com/en-us/graph/graph-explorer">
+                    </div>
+                  </div>
+                  <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 8px;">
+                    <div>
+                      <label style="font-weight: 600;">Azure Tenant ID:</label>
+                      <input type="text" id="guide-tenant-id" class="fluent-input" style="padding: 2px 6px; font-size: 11px;" value="common" placeholder="common or tenant ID">
+                    </div>
+                    <div style="display: flex; align-items: flex-end;">
+                      <button id="guide-gen-auth-btn" type="button" class="fluent-button primary" style="width: 100%; padding: 4px 8px; font-size: 11px;">🔗 Request Token</button>
+                    </div>
+                  </div>
+                  <div style="margin-top: 4px;">
+                    <label style="font-weight: 600; display: block; margin-bottom: 2px;">Generated Auth Request URL:</label>
+                    <textarea id="guide-generated-url" class="fluent-input" readonly rows="2" style="font-family: var(--font-mono); font-size: 10px; resize: none; background: rgba(0,0,0,0.2);"></textarea>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Accordion Step 4 -->
+              <div style="background-color: var(--bg-hover); padding: 12px; border-radius: 6px; border-left: 4px solid var(--accent);">
+                <strong style="display: block; font-size: 13px; color: var(--text-primary); margin-bottom: 4px;">4️⃣ Alternate Methods: Graph Explorer / Credentials Flow</strong>
+                <span style="font-size: 12px; color: var(--text-secondary);">
+                  <strong>Quickest Method:</strong> Navigate to the <a href="https://developer.microsoft.com/en-us/graph/graph-explorer" target="_blank" style="color: var(--accent); text-decoration: underline;">Microsoft Graph Explorer</a>, log in, open the <strong>Access Token</strong> tab, copy the active token, and paste it on the left panel.
+                  <br><br>
+                  <strong>Daemon / Client Credentials Flow (No Interactive User Consent):</strong>
+                  Request a token in terminal using <code>client_id</code> and <code>client_secret</code>:
+                  <pre style="background: #1e1e1e; color: #d4d4d4; padding: 6px; border-radius: 4px; overflow-x: auto; font-family: var(--font-mono); font-size: 10px; margin-top: 6px;">curl -X POST https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "client_id={client_id}" \
+  -d "scope=https://graph.microsoft.com/.default" \
+  -d "client_secret={client_secret}" \
+  -d "grant_type=client_credentials"</pre>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- View 12: Logs Console Panel -->
+      <section id="logs-view" class="view-panel">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 20px;">
+          <h2>Application Logs Console</h2>
+          <div style="display: flex; gap: 8px;">
+            <button id="logs-export-btn" class="fluent-button">📥 Export Logs</button>
+            <button id="logs-clear-btn" class="fluent-button" style="color: var(--status-error); border-color: var(--status-error);">🗑️ Clear Logs</button>
+          </div>
+        </div>
+
+        <div class="fluent-card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h3>📟 Real-Time Logs Ticker</h3>
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <span>Filter logs:</span>
+              <select id="logs-filter-select" class="fluent-input" style="padding: 2px 6px;">
+                <option value="all">All Logs</option>
+                <option value="info">Information</option>
+                <option value="warning">Warnings</option>
+                <option value="error">Errors</option>
+                <option value="success">Success</option>
+              </select>
+            </div>
+          </div>
+          <!-- Real scrollable text output window -->
+          <div class="log-console" id="logs-console-viewport">
+            <!-- Dynamically populated logging rows -->
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Shared Modal Popups overlays -->
+  <!-- Modal 1: Create New Folder Name -->
+  <div class="modal-overlay" id="create-folder-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>➕ Create New Folder</h3>
+        <button class="modal-close fluent-button" style="padding: 2px 6px; border: none; font-size: 16px;">&times;</button>
+      </div>
+      <div class="fluent-input-group" style="margin-top: 10px;">
+        <label for="new-folder-name-input">Folder Name:</label>
+        <input type="text" id="new-folder-name-input" class="fluent-input" placeholder="e.g. Documents_2026" required>
+      </div>
+      <div class="modal-footer">
+        <button class="fluent-button modal-cancel">Cancel</button>
+        <button class="fluent-button primary" id="confirm-create-folder-btn">Create Folder</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 2: File/Folder Rename Input -->
+  <div class="modal-overlay" id="rename-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>✏️ Rename Item</h3>
+        <button class="modal-close fluent-button" style="padding: 2px 6px; border: none; font-size: 16px;">&times;</button>
+      </div>
+      <div class="fluent-input-group" style="margin-top: 10px;">
+        <label for="rename-item-input">Enter New Name:</label>
+        <input type="text" id="rename-item-input" class="fluent-input" placeholder="New filename..." required>
+      </div>
+      <div class="modal-footer">
+        <button class="fluent-button modal-cancel">Cancel</button>
+        <button class="fluent-button primary" id="confirm-rename-btn">Save Rename</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 3: Target selector for Move or Copy operations -->
+  <div class="modal-overlay" id="transfer-op-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="transfer-modal-title">➡️ Move Item</h3>
+        <button class="modal-close fluent-button" style="padding: 2px 6px; border: none; font-size: 16px;">&times;</button>
+      </div>
+      <div class="fluent-input-group" style="margin-top: 10px;">
+        <label for="transfer-target-folder-id">Target Destination Folder ID:</label>
+        <input type="text" id="transfer-target-folder-id" class="fluent-input" placeholder="Enter target folder UUID or type 'root'" required>
+      </div>
+      <div class="modal-footer">
+        <button class="fluent-button modal-cancel">Cancel</button>
+        <button class="fluent-button primary" id="confirm-transfer-btn">Execute</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 4: Custom Reusable Confirmation -->
+  <div class="modal-overlay" id="custom-confirm-modal">
+    <div class="modal-content" style="max-width: 420px;">
+      <div class="modal-header">
+        <h3 id="custom-confirm-title">Confirm Action</h3>
+        <button class="modal-close fluent-button" id="custom-confirm-close" style="padding: 2px 6px; border: none; font-size: 16px;">&times;</button>
+      </div>
+      <div style="margin: 20px 0; line-height: 1.5; font-size: 14px; color: var(--text-primary);" id="custom-confirm-message">
+        Are you sure you want to perform this action?
+      </div>
+      <div class="modal-footer">
+        <button class="fluent-button modal-cancel" id="custom-confirm-cancel">Cancel</button>
+        <button class="fluent-button" id="custom-confirm-btn" style="background-color: var(--status-error); border-color: var(--status-error); color: #ffffff;">Yes, Proceed</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast notifications feedback container -->
+  <div class="toast-container" id="toast-messages-container"></div>
+
+  <!-- Main app script orchestration -->
+  <script type="module" src="./script.js"></script>
+</body>
+</html>
